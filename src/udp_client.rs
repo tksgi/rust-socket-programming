@@ -6,7 +6,7 @@ pub fn communicate(address: &str) -> Result<(), failure::Error> {
     // loop {
         // let mut input = String::new();
         // io::stdin().read_line(&mut input)?;
-        let input = "a".to_string().repeat(70000);
+        let input = "a".to_string().repeat(65507);
         socket.send_to(input.as_bytes(), address)?;
 
         let mut buffer = [0u8; 1024];
