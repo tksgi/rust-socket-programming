@@ -24,6 +24,8 @@ fn handler(mut stream: TcpStream) -> Result<(), failure::Error> {
     let mut buffer = [0u8; 1024]; // 符号なし8-bit整数型;
     loop {
         let nbytes = stream.read(&mut buffer)?;
+
+        // stream.readはConnectionが切断されると0を返す
         if nbytes == 0 {
             debug!("Connection closed.");
             return Ok(());
