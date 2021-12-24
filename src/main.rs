@@ -23,6 +23,7 @@ fn main() {
         "tcp" => match role {
             "server" => {
                 // TODO: TCPサーバーの呼び出し
+                tcp_server::serve(address).unwrap_or_else(|e| error!("{}", e));
             }
             "client" => {
                 // TODO: TCPクライアントの呼び出し
