@@ -75,3 +75,23 @@ fn main() {
     )
     .expect("Failed to open channel.");
 }
+
+// パケットを生成
+fn build_packet(packet_info: &PacketInfo) -> [u8; TCP_SIZE] {
+    // TCPヘッダの作成
+    let mut tcp_buffer = [0u8; TCP_SIZE];
+    let mut tcp_header = MutableTcpPacket::new(&mut tcp_buffer[..]).unwrap();
+    tcp_header.set_source(packet_info.my_port);
+
+    // オプションを含まないので、20オクテットまでがTCPヘッダ。4オクテット単位で指定する
+    tcp_header.set_data_offset(5);
+    tcp_header.set_flags(packet_info.scan_type as u16);
+    let checksum = tcp::ipv4_checksum(
+        &tcp_header.to_immutable(),
+        &packet_info.my_ipaddr,
+        &packet_info.target_ipaddr,
+    );
+    tcp_header.set_checksum(checksum);
+
+    tcp_buffer
+}
