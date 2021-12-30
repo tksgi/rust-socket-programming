@@ -95,3 +95,21 @@ fn build_packet(packet_info: &PacketInfo) -> [u8; TCP_SIZE] {
 
     tcp_buffer
 }
+
+/**
+* TCPヘッダの宛先ポート情報を書き変える。
+* チェックサムを計算し直す必要がある
+*/
+fn reregister_destination_port(
+    target: u16,
+    tcp_header: &mut MutableTcpPacket,
+    packet_info: &PacketInfo,
+    ){
+    tcp_header.set_destination(target);
+    let checksum = tcp::ipv4_checksum(
+        &tcp_header.to_immutable(),
+        &packet_info.my_ipaddr,
+        &packet_info.target_ipaddr,
+    );
+    tcp_header.set_checksum(checksum);
+}
