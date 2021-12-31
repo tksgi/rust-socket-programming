@@ -113,3 +113,57 @@ fn reregister_destination_port(
     );
     tcp_header.set_checksum(checksum);
 }
+
+/**
+* パケットを受信してスキャン結果を出力する
+*/
+fn receive_packets(
+    tr: &mut TransportReceiver,
+    packet_info: &PacketInfo,
+    ) -> Result<(), failure::Error> {
+    let mut reply_ports = Vec::new();
+    let mut packet_iter = transport::tcp_packet_iter(tr);
+    loop {
+        // ターゲットからの返信パケット
+        let tcp_packet = match packet_iter.next() {
+            Ok((tcp_packet, _)) => {
+                if tcp_packet.get_destination() == packet_info.my_port {
+                    tcp_packet
+                } else {
+                    continue;
+                }
+            }
+            Err(_) => continue,
+        };
+    }
+
+    let target_port = tcp_packet.get_source();
+    match packet_info.scan_type {
+        ScanType::Syn => {
+        if tcp_packet.get_flags() == TcpFlags::SYN | TcpFlags::ACK {
+                println!("port {} is open", target_port);
+            }
+        }
+        // SYNスキャン以外はレスポンスが返ってきたポート(=閉じているポート)を記録
+        ScanType::Fin | ScanType::Xmas | ScanType::Null => {
+        reply_ports.push(target_port);
+        }
+    }
+
+    /* [1] スキャン対象の最後のポートに対する返信が返ってこれば終了 */
+    if target_port != packet_info.maximum_port {
+        continue;
+    }
+    match packet_info.scan_type {
+        ScanType::Fin | ScanType::Xmas | ScanType::Null => {
+            for i in 1..=packet_info.maximum_port {
+                if reply_ports.iter().find(|&&x| x == i ).is_none() {
+                println!("port {} is open", i);
+                }
+
+            }
+        }
+        _ => {}
+    }
+    return Ok(());
+}
