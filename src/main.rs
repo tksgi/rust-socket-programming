@@ -74,6 +74,12 @@ fn main() {
         TransportChannelType::Layer4(TransportProtocol::Ipv4(IpNextHeaderProtocols::Tcp)),
     )
     .expect("Failed to open channel.");
+
+    // パケットの送受信を並行で行う
+    rayon::join(
+        || send_packet(&mut ts, &packet_info),
+        || receive_packets(&mut tr, &packet_info),
+    )
 }
 
 // パケットを生成
@@ -104,7 +110,7 @@ fn reregister_destination_port(
     target: u16,
     tcp_header: &mut MutableTcpPacket,
     packet_info: &PacketInfo,
-    ){
+) {
     tcp_header.set_destination(target);
     let checksum = tcp::ipv4_checksum(
         &tcp_header.to_immutable(),
@@ -120,7 +126,7 @@ fn reregister_destination_port(
 fn receive_packets(
     tr: &mut TransportReceiver,
     packet_info: &PacketInfo,
-    ) -> Result<(), failure::Error> {
+) -> Result<(), failure::Error> {
     let mut reply_ports = Vec::new();
     let mut packet_iter = transport::tcp_packet_iter(tr);
     loop {
@@ -140,13 +146,13 @@ fn receive_packets(
     let target_port = tcp_packet.get_source();
     match packet_info.scan_type {
         ScanType::Syn => {
-        if tcp_packet.get_flags() == TcpFlags::SYN | TcpFlags::ACK {
+            if tcp_packet.get_flags() == TcpFlags::SYN | TcpFlags::ACK {
                 println!("port {} is open", target_port);
             }
         }
         // SYNスキャン以外はレスポンスが返ってきたポート(=閉じているポート)を記録
         ScanType::Fin | ScanType::Xmas | ScanType::Null => {
-        reply_ports.push(target_port);
+            reply_ports.push(target_port);
         }
     }
 
@@ -157,10 +163,9 @@ fn receive_packets(
     match packet_info.scan_type {
         ScanType::Fin | ScanType::Xmas | ScanType::Null => {
             for i in 1..=packet_info.maximum_port {
-                if reply_ports.iter().find(|&&x| x == i ).is_none() {
-                println!("port {} is open", i);
+                if reply_ports.iter().find(|&&x| x == i).is_none() {
+                    println!("port {} is open", i);
                 }
-
             }
         }
         _ => {}
