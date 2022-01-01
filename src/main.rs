@@ -38,7 +38,7 @@ fn main() {
     }
 
     let packet_info = {
-        let contsnts = fs::read_to_string(".env").expect("Failed to read env file");
+        let contents = fs::read_to_string(".env").expect("Failed to read env file");
         let lines: Vec<_> = contents.split('\n').collect();
         let mut map = HashMap::new();
         for line in lines {
@@ -79,7 +79,7 @@ fn main() {
     rayon::join(
         || send_packet(&mut ts, &packet_info),
         || receive_packets(&mut tr, &packet_info),
-    )
+    );
 }
 
 // パケットを生成
@@ -100,6 +100,21 @@ fn build_packet(packet_info: &PacketInfo) -> [u8; TCP_SIZE] {
     tcp_header.set_checksum(checksum);
 
     tcp_buffer
+}
+
+/**
+ * 指定のレンジにパケットを送信
+ */
+fn send_packet(ts: &mut TransportSender, packet_info: &PacketInfo) -> Result<(), failure::Error> {
+    let mut packet = build_packet(packet_info);
+    for i in 1..=packet_info.maximum_port {
+        let mut tcp_header =
+            MutableTcpPacket::new(&mut packet).ok_or_else(|| failure::err_msg("invalid packet"))?;
+        reregister_destination_port(i, &mut tcp_header, packet_info);
+        thread::sleep(Duration::from_millis(5));
+        ts.send_to(tcp_header, IpAddr::V4(packet_info.target_ipaddr))?;
+    }
+    Ok(())
 }
 
 /**
@@ -141,34 +156,34 @@ fn receive_packets(
             }
             Err(_) => continue,
         };
-    }
 
-    let target_port = tcp_packet.get_source();
-    match packet_info.scan_type {
-        ScanType::Syn => {
-            if tcp_packet.get_flags() == TcpFlags::SYN | TcpFlags::ACK {
-                println!("port {} is open", target_port);
-            }
-        }
-        // SYNスキャン以外はレスポンスが返ってきたポート(=閉じているポート)を記録
-        ScanType::Fin | ScanType::Xmas | ScanType::Null => {
-            reply_ports.push(target_port);
-        }
-    }
-
-    /* [1] スキャン対象の最後のポートに対する返信が返ってこれば終了 */
-    if target_port != packet_info.maximum_port {
-        continue;
-    }
-    match packet_info.scan_type {
-        ScanType::Fin | ScanType::Xmas | ScanType::Null => {
-            for i in 1..=packet_info.maximum_port {
-                if reply_ports.iter().find(|&&x| x == i).is_none() {
-                    println!("port {} is open", i);
+        let target_port = tcp_packet.get_source();
+        match packet_info.scan_type {
+            ScanType::Syn => {
+                if tcp_packet.get_flags() == TcpFlags::SYN | TcpFlags::ACK {
+                    println!("port {} is open", target_port);
                 }
             }
+            // SYNスキャン以外はレスポンスが返ってきたポート(=閉じているポート)を記録
+            ScanType::Fin | ScanType::Xmas | ScanType::Null => {
+                reply_ports.push(target_port);
+            }
         }
-        _ => {}
+
+        /* [1] スキャン対象の最後のポートに対する返信が返ってこれば終了 */
+        if target_port != packet_info.maximum_port {
+            continue;
+        }
+        match packet_info.scan_type {
+            ScanType::Fin | ScanType::Xmas | ScanType::Null => {
+                for i in 1..=packet_info.maximum_port {
+                    if reply_ports.iter().find(|&&x| x == i).is_none() {
+                        println!("port {} is open", i);
+                    }
+                }
+            }
+            _ => {}
+        }
+        return Ok(());
     }
-    return Ok(());
 }
