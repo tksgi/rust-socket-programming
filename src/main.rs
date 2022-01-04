@@ -1,14 +1,12 @@
-extern crate mio;
-extern crate regex;
-
-use std::net::SocketAddr;
-use std::{ env, str, fs };
-use std::io::{ Error, Read, BufReader, Write };
-use std::collections::HashMap;
-
-use mio::*;
-use mio::tcp::{ TcpListener, TcpStream };
+use mio::tcp::{TcpListener, TcpStream};
+use mio::{Event, Events, Poll, PollOpt, Ready, Token};
 use regex::Regex;
+use std::collections::HashMap;
+use std::fs::File;
+use std::io::{BufReader, Read, Write};
+use std::{env, process, str};
+#[macro_use]
+extern crate log;
 
 
 const SERVER: Token = Token(0);
@@ -31,7 +29,7 @@ impl WebServer {
         Ok(WebServer {
             listening_socket,
             connections: HashMap::new(),
-            next_connection_id,
+            next_connection_id: 1,
             })
     }
 
