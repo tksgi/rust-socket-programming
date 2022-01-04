@@ -76,13 +76,68 @@ impl WebServer {
                     }
 
                     Token(conn_id) => {
-                        // 接続済みソケットでイベント発生
+                        // 接続済みソケットで発生したイベントのハンドラ
                         self.http_handler(conn_id, event, &poll, &mut response)
                             .unwrap_or_else(|e| error!("{  }", e));
                     }
                 }
             }
         }
+    }
+
+    /**
+     * 接続済みソケットを監視対象に登録
+     */
+    fn register_connection(
+        &mut self,
+        poll: &Poll,
+        stream: TcpStream,
+    ) -> Result<(), failure::Error> {
+        let token = Token(self.next_connection_id);
+        poll.register(&stream, token, Ready::readable(), PollOpt::edge())?;
+
+        if self
+            .connections
+            .insert(self.next_connection_id, stream)
+            .is_some()
+        {
+            // HashMapは既存のキーで値が更新されると更新前の値を返すため、その場合エラーにする
+            error!("Connection ID is already exist.");
+        }
+        self.next_connection_id += 1;
+        Ok(())
+    }
+
+    /**
+    * 接続済みソケットで発生したイベントのハンドラ
+    */
+    fn http_handler(&mut self, conn_id: usize, event: Event, poll: &Poll, response: &mut Vec<u8>,) -> Result<(), failure::Error>{
+        let stream = self.connections.get_mut(&conn_id).ok_or_else(|| failure::err_msg("Failed to get connection."))?;
+        if event.readiness().is_readable() {
+            // ソケットから読み込み可能
+            debug!("readable conn_id: {}", conn_id);
+            let mut buffer = [0u8; 1024];
+            let nbytes = stream.read(&mut buffer)?;
+
+            if nbytes != 0 {
+                *respose = make_response(&buffer[..nbytes])?;
+                // 書き込み操作の可否を監視対象に入れる
+                poll.reregister(stream, Token(conn_id), Ready::writable(), PollOpt::edge())?;
+            } else {
+                // 通信終了
+                self.connections.remove(&conn_id);
+            }
+            Ok(())
+        } else if event.readiness().is_writable() {
+            // ソケットに書き込み可能
+            debug!("writable conn_id: {}", conn_id);
+            stream.write_all(response)?;
+            self.connections.remove(&conn_id);
+            Ok(())
+        } else {
+            Err(failure::err_msg("Undefined event."))
+        }
+
     }
 }
 
