@@ -208,7 +208,11 @@ fn create_msg_from_code(status_code: u16, msg: Option<Vec<u8>>) -> Result<Vec<u8
             Server: mio webserver\r\n\r\n"
             .to_string()
             .into_bytes()),
-        501 => Ok("HTTP/1.0 501 Not Fount\r\n
+        404 => Ok("HTTP/1.0 404 Not Found\r\n
+            Server: mio webserver\r\n\r\n"
+            .to_string()
+            .into_bytes()),
+        501 => Ok("HTTP/1.0 501 Not Impletemted\r\n
             Server: mio webserver\r\n\r\n"
             .to_string()
             .into_bytes()),
