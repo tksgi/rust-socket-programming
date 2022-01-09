@@ -212,7 +212,10 @@ fn create_msg_from_code(status_code: u16, msg: Option<Vec<u8>>) -> Result<Vec<u8
             Server: mio webserver\r\n\r\n"
             .to_string()
             .into_bytes()),
-        _ => Err(failure::err_msg("Undefined status Code.")),
+        _ =>{
+            debug!("status {} is undefined. msg is {:?}", status_code, msg);
+            Err(failure::err_msg("Undefined status Code."))
+        }
     }
 }
 
