@@ -217,5 +217,19 @@ fn create_msg_from_code(status_code: u16, msg: Option<Vec<u8>>) -> Result<Vec<u8
 }
 
 fn main() {
-    println!("Hello, world!");
+    env::set_var("RUST_LOG", "debug");
+    env_logger::init();
+    let args: Vec<String> = env::args().collect();
+    if args.len() != 2 {
+        error!("wrong number of arguments.");
+        process::exit(1);
+    }
+    let mut server = WebServer::new(&args[1]).unwrap_or_else(|e| {
+        error!("{}", e);
+        panic!();
+    });
+    server.run().unwrap_or_else(|e| {
+        error!("{}", e);
+        panic!();
+    });
 }
